@@ -1,0 +1,217 @@
+Sub Macro1()
+'
+' Macro1 Macro
+'
+' Keyboard Shortcut: Ctrl+j
+'
+'変数宣言
+Dim fnd As Range
+Dim adr, scarea As String
+Dim activebookname, activebookpath, copyname, files As String
+Dim workpoint_begin, workpoint_begin2, workpoint_end, endcol As Integer
+Dim wb As Workbook
+Dim ws As Worksheet
+Dim filelist As Object
+
+
+activebookname = Application.ActiveWorkbook.Name
+activebookpath = Application.ActiveWorkbook.Path
+copyname = activebookpath + "\check_" + activebookname
+
+
+'ファイルコピー
+Set wb = Workbooks.Open(Application.ActiveWorkbook.FullName)
+If Dir(copyname) <> "" Then
+        'メッセージボックス表示
+        Prompt = "同名ファイルが存在します。" & Chr(13) & "上書きしますか？"
+        Buttons = vbYesNo + vbInformation + vbDefaultButton2
+        Title = "ブックのコピーを保存"
+        Result = MsgBox(Prompt, Buttons, Title)
+
+        '「No」を選択した時、ブックを閉じて終了
+        If Result = vbNo Then
+            MsgBox "終了します。"
+            Exit Sub
+        End If
+    End If
+wb.SaveCopyAs copyname
+
+'オリジナルの編集箇所
+ActiveSheet.Rows.ClearOutline
+ActiveSheet.scrollarea = ""
+Set fnd = Cells.Find("チェック")
+fnd.Select
+workpoint_begin = ActiveCell.Offset(1, 0).Row
+'For i = 1 To ActiveCell.Offset(-1, 0).Row
+'    Rows(i).Interior.Color = RGB(0, 0, 0)
+'Next
+
+ActiveCell.Offset(1, 0).Select
+ActiveCell.Value = "■"
+Application.DisplayAlerts = False
+ActiveWorkbook.Save
+ActiveWorkbook.Close
+Application.DisplayAlerts = True
+
+
+'コピーファイルの編集
+Workbooks.Open copyname
+'最初の手順箇所以外をグループ化して隠す
+ActiveSheet.Rows.ClearOutline
+ActiveSheet.scrollarea = ""
+Set fnd = Cells.Find("チェック")
+fnd.Select
+workpoint_begin = ActiveCell.Offset(1, 0).Row
+'For i = 1 To ActiveCell.Offset(-1, 0).Row
+'    Rows(i).Interior.Color = RGB(0, 0, 0)
+'Next
+
+ActiveCell.Offset(1, 0).Select
+ActiveCell.Value = "■"
+ActiveCell.Offset(1, 0).Select
+
+Do While True
+    '最終行の時は抜ける
+    If ActiveCell.Row = ActiveCell.End(xlUp).Row Then
+        Exit Do
+    End If
+    ActiveCell.Offset(1, 0).Select
+    '次の作業以降をグループ化して隠す
+    If ActiveCell.Value = "□" Then
+        workpoint_begin2 = ActiveCell.Row
+        workpoint_end = ActiveCell.SpecialCells(xlLastCell).Row
+        endcol = ActiveSheet.UsedRange.Columns(ActiveSheet.UsedRange.Columns.Count).Column
+        'グループ化して隠す
+        Range(Cells(workpoint_begin2, 1), Cells(workpoint_end, endcol)).Rows.Group
+        ActiveSheet.Outline.ShowLevels rowlevels:=1
+        scarea = Range(Cells(workpoint_begin, 1), Cells(workpoint_end, endcol)).Address
+        ActiveSheet.scrollarea = scarea
+        
+        Exit Do
+    End If
+Loop
+
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+Sub Macro2()
+'
+' Macro2 Macro
+'
+' Keyboard Shortcut: Ctrl+k
+'
+'変数宣言
+Dim fnd As Range
+Dim adr, scarea As String
+Dim activebookname, activebookpath, orgname, files As String
+Dim workpoint_begin, datepoint, workpoint_begin2, workpoint_end, workpoint_end2, endcol As Integer
+Dim wb As Workbook
+Dim ws As Worksheet
+Dim filelist As Object
+Dim endnum As Integer
+
+activebookname = Application.ActiveWorkbook.Name
+activebookpath = Application.ActiveWorkbook.Path
+If InStr(activebookname, "check") = False Then
+    MsgBox ("手順チェック用のブック以外が選択されてます")
+    Exit Sub
+End If
+orgname = activebookpath & "\" & Replace(activebookname, "check_", "")
+
+ActiveSheet.Rows.ClearOutline
+ActiveSheet.scrollarea = ""
+Set fnd = Cells.Find("チェック")
+fnd.Offset(1, 0).Select
+
+'チェック欄を検索
+workpoint_begin = ActiveCell.Row
+datepoint = workpoint_begin
+workpoint_end = ""
+workpoint_begin2 = ""
+workpoint_end2 = ActiveCell.SpecialCells(xlLastCell).Row
+endcol = ActiveSheet.UsedRange.Columns(ActiveSheet.UsedRange.Columns.Count).Column
+endnum = 0
+
+workpoint_end2 = ActiveCell.SpecialCells(xlLastCell).Row
+
+Do While True
+    If endnum > 10 Then
+        workpoint_end2 = ActiveCell.Row
+        Exit Do
+    End If
+    '最終行の時は抜ける
+    If ActiveCell.Row = ActiveCell.End(xlUp).Row Then
+        Exit Do
+    End If
+    ActiveCell.Offset(1, 0).Select
+    '次の作業以降をグループ化して隠す
+    If ActiveCell.Value = "■" Then
+        datepoint = ActiveCell.Row
+    ElseIf ActiveCell.Value = "□" Then
+        If workpoint_end = "" And workpoint_begin2 = "" Then
+            workpoint_end = ActiveCell.Row
+        ElseIf workpoint_end <> "" And workpoint_begin2 = "" Then
+            workpoint_begin2 = ActiveCell.Row
+        End If
+    End If
+    For i = 1 To endcol
+        If Cells(ActiveCell.Row, i).Value <> "" Then
+            Exit For
+        ElseIf i = endcol Then
+            endnum = endnum + 1
+        End If
+    Next
+Loop
+  
+'作業実績時間の処理
+If workpoint_begin2 = "" And Cells(datepoint, (ActiveCell.Column - 1)).Value <> "" Then
+    MsgBox ("このシート内のタスクは全て完了しています。")
+ElseIf Cells(datepoint, (ActiveCell.Column - 1)).Value <> "" Then
+    MsgBox ("実績がすでに入力されています。　手動での入力はしないでください。")
+Else
+    If workpoint_end <> "" Or workpoint_begin2 <> "" Then
+        Cells(workpoint_end, ActiveCell.Column).Value = "■"
+    End If
+    Cells(datepoint, (ActiveCell.Column - 1)).Value = Time
+    Workbooks.Open orgname
+    Cells(datepoint, (ActiveCell.Column - 1)).Value = Time
+    If workpoint_end <> "" Or workpoint_begin2 <> "" Then
+        Cells(workpoint_end, ActiveCell.Column).Value = "■"
+    End If
+    Application.DisplayAlerts = False
+    ActiveWorkbook.Save
+    ActiveWorkbook.Close
+    Application.DisplayAlerts = True
+    Workbooks.Open activebookpath & "\" & activebookname
+End If
+        
+'グループ化して隠す
+If workpoint_end <> "" Then
+    Range(Cells(workpoint_begin, 1), Cells((workpoint_end - 1), endcol)).Rows.Group
+End If
+If workpoint_begin2 <> "" Then
+    Range(Cells(workpoint_begin2, 1), Cells(workpoint_end2, endcol)).Rows.Group
+End If
+If workpoint_end <> "" Or workpoint_begin2 <> "" Then
+    ActiveSheet.Outline.ShowLevels rowlevels:=1
+    If workpoint_begin2 = "" Then
+        workpoint_begin2 = workpoint_end2 - 10
+    End If
+    scarea = Range(Cells(workpoint_end, 1), Cells((workpoint_begin2 - 1), endcol)).Address
+    ActiveSheet.scrollarea = scarea
+Else
+    MsgBox ("お疲れ様です")
+End If
+
+End Sub
+
